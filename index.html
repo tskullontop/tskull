@@ -7,9 +7,10 @@
     body {
       margin: 0;
       overflow: hidden;
-      background: url('background.png') no-repeat center center fixed;
+      background: url('images/background.png') no-repeat center center fixed;
       background-size: cover;
       font-family: Arial, sans-serif;
+      position: relative;
     }
     canvas {
       display: block;
@@ -23,10 +24,36 @@
       text-shadow: 1px 1px 2px black;
       user-select: none;
     }
+    #telegram-text {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 24px;
+      font-weight: bold;
+      animation: colorShift 3s infinite;
+      user-select: none;
+    }
+    @keyframes colorShift {
+      0% { color: #ff0000; }
+      33% { color: #00ff00; }
+      66% { color: #0000ff; }
+      100% { color: #ff0000; }
+    }
+    #credit-text {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      font-size: 12px;
+      color: black;
+      user-select: none;
+    }
   </style>
 </head>
 <body>
   <div id="score">Score: 0</div>
+  <div id="telegram-text">@turtlesskull on telegram</div>
+  <div id="credit-text">@iownfags credit</div>
   <canvas id="gameCanvas"></canvas>
 
   <script>
@@ -38,24 +65,26 @@
 
       let score = 0;
       const scoreEl = document.getElementById('score');
+      let failedImages = [];
 
-      const playerImg = new Image();
-      playerImg.src = 'selfie.png';
+      const images = {
+        player: { src: 'images/selfie.png', img: new Image() },
+        green: [
+          { src: 'images/milk.png', img: new Image() },
+          { src: 'images/syn.png', img: new Image() }
+        ],
+        red: [
+          { src: 'images/2man.png', img: new Image() },
+          { src: 'images/man.png', img: new Image() }
+        ]
+      };
 
-      const greenImages = ['milk.png', 'syn.png'].map(src => {
-        const img = new Image();
-        img.src = src;
-        return img;
-      });
-
-      const redImages = ['2man.png', 'man.png'].map(src => {
-        const img = new Image();
-        img.src = src;
-        return img;
-      });
+      images.player.img.src = images.player.src;
+      images.green.forEach(imgObj => imgObj.img.src = imgObj.src);
+      images.red.forEach(imgObj => imgObj.img.src = imgObj.src);
 
       const player = {
-        x: canvas.width / 2 - 25,
+        x: canvas.width / 2 - 60,
         y: canvas.height - 120,
         width: 120,
         height: 120,
@@ -78,15 +107,23 @@
         constructor(x, y, type) {
           this.x = x;
           this.y = y;
-          this.size = 100; // bigger blocks
+          this.size = 100;
           this.speed = 0.5 + Math.random() * 0.5;
           this.type = type;
-          const imgs = type === 'green' ? greenImages : redImages;
-          this.image = imgs[Math.floor(Math.random() * imgs.length)];
+          const imgs = type === 'green' ? images.green : images.red;
+          const availableImgs = imgs.filter(imgObj => imgObj.img.complete && imgObj.img.naturalWidth !== 0);
+          this.image = availableImgs.length > 0
+            ? availableImgs[Math.floor(Math.random() * availableImgs.length)].img
+            : null;
         }
 
         draw() {
-          ctx.drawImage(this.image, this.x, this.y, this.size, this.size);
+          if (this.image) {
+            ctx.drawImage(this.image, this.x, this.y, this.size, this.size);
+          } else {
+            ctx.fillStyle = this.type === 'green' ? 'green' : 'red';
+            ctx.fillRect(this.x, this.y, this.size, this.size);
+          }
         }
 
         update() {
@@ -105,47 +142,4 @@
 
       function updatePlayer() {
         if (keys.left && player.x > 0) player.x -= player.speed;
-        if (keys.right && player.x + player.width < canvas.width) player.x += player.speed;
-        ctx.drawImage(playerImg, player.x, player.y, player.width, player.height);
-      }
-
-      function detectCollisions() {
-        for (let i = blocks.length - 1; i >= 0; i--) {
-          const b = blocks[i];
-          if (
-            b.x < player.x + player.width &&
-            b.x + b.size > player.x &&
-            b.y < player.y + player.height &&
-            b.y + b.size > player.y
-          ) {
-            if (b.type === 'green') score += 1;
-            else score -= 1;
-            blocks.splice(i, 1);
-            scoreEl.textContent = `Score: ${score}`;
-          } else if (b.y > canvas.height) {
-            blocks.splice(i, 1);
-          }
-        }
-      }
-
-      playerImg.onload = () => {
-        setInterval(spawnBlock, 1200);
-        gameLoop();
-      };
-
-      function gameLoop() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        updatePlayer();
-        detectCollisions();
-        blocks.forEach(block => block.update());
-        requestAnimationFrame(gameLoop);
-      }
-
-      window.addEventListener('resize', () => {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-      });
-    });
-  </script>
-</body>
-</html>
+        if (keys.right &&
